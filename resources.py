@@ -10,8 +10,8 @@ parser.add_argument('limit', type=int, default=100)
 queue_fields = {
     'id': fields.Integer,
     'name': fields.String,
-    'createdAt': fields.DateTime(),
-    'updatedAt': fields.DateTime(),
+    'createdAt': fields.DateTime(dt_format='iso8601'),
+    'updatedAt': fields.DateTime(dt_format='iso8601'),
 }
 
 get_fields = {
@@ -26,7 +26,7 @@ class Queue(Resource):
     @marshal_with(get_fields)
     def get(self):
         args = parser.parse_args()
-        queues = models.Queue.query().offset(args['start']).limit(args['limit']).all()
+        queues = models.Queue.query.offset(args['start']).limit(args['limit']).all()
 
         res = {
             'start': args['start'],

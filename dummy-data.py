@@ -4,6 +4,7 @@ from app import app
 models.db.init_app(app)
 
 with app.app_context():
+    models.db.drop_all()
     models.db.create_all()
 
     q1 = models.Queue(name='Cool')
