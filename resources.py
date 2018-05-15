@@ -56,23 +56,15 @@ class QueueCollection(Resource):
 
 
 class QueueItem(Resource):
-
-    def get_queue(self, queue_id):
-        queue = models.Queue.query.filter(models.Queue.id == queue_id).first()
-
-        if not queue:
-            abort(404)
-
-        return queue
-
     @marshal_with(queue_fields)
     def get(self, queue_id):
-        return self.get_queue(queue_id)
+        return get_queue(queue_id)
 
     @marshal_with(queue_fields)
     def put(self, queue_id):
         args = post_queue_parser.parse_args()
-        queue = self.get_queue(queue_id)
+
+        queue = get_queue(queue_id)
         queue.name = args['name']
 
         models.db.session.commit()
@@ -80,7 +72,65 @@ class QueueItem(Resource):
         return queue
 
     def delete(self, queue_id):
-        queue = self.get_queue(queue_id)
+        queue = get_queue(queue_id)
 
         models.db.session.delete(queue)
         models.db.session.commit()
+
+
+counter_fields = {
+    'id': fields.Integer,
+    'name': fields.String,
+    'number': fields.Integer,
+    'createdAt': fields.DateTime(dt_format='iso8601'),
+    'updatedAt': fields.DateTime(dt_format='iso8601'),
+}
+
+counters_fields = {
+    'start': fields.Integer,
+    'limit': fields.Integer,
+    'count': fields.Integer,
+    'results': fields.List(fields.Nested(counter_fields))
+}
+
+counter_parser = reqparse.RequestParser()
+counter_parser.add_argument('name', type=str, required=True)
+counter_parser.add_argument('number', type=int, required=True)
+
+
+class CounterCollection(Resource):
+    @marshal_with(counters_fields)
+    def get(self, queue_id):
+        args = get_parser.parse_args()
+
+        counters = models.Counter.query.filter(models.Counter.queue_id == queue_id).all()
+
+        res = {
+            'start': args['start'],
+            'limit': args['limit'],
+            'count': len(counters),
+            'results': counters
+        }
+
+        return res, 200 if len(counters) > 0 else 204
+
+    @marshal_with(counter_fields)
+    def post(self, queue_id):
+        args = counter_parser.parse_args()
+
+        counter = models.Counter(name=args['name'], number=args['number'])
+        counter.queue_id = queue_id
+
+        models.db.session.add(counter)
+        models.db.session.commit()
+
+        return counter
+
+
+def get_queue(queue_id):
+    queue = models.Queue.query.filter(models.Queue.id == queue_id).first()
+
+    if not queue:
+        abort(404)
+
+    return queue
