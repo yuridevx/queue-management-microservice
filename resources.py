@@ -56,15 +56,24 @@ class QueueCollection(Resource):
 
 
 class QueueItem(Resource):
+    @staticmethod
+    def get_queue(queue_id):
+        queue = models.Queue.query.filter(models.Queue.id == queue_id).first()
+
+        if not queue:
+            abort(404)
+
+        return queue
+
     @marshal_with(queue_fields)
     def get(self, queue_id):
-        return get_queue(queue_id)
+        return self.get_queue(queue_id)
 
     @marshal_with(queue_fields)
     def put(self, queue_id):
         args = post_queue_parser.parse_args()
 
-        queue = get_queue(queue_id)
+        queue = self.get_queue(queue_id)
         queue.name = args['name']
 
         models.db.session.commit()
@@ -72,7 +81,7 @@ class QueueItem(Resource):
         return queue
 
     def delete(self, queue_id):
-        queue = get_queue(queue_id)
+        queue = self.get_queue(queue_id)
 
         models.db.session.delete(queue)
         models.db.session.commit()
@@ -93,9 +102,9 @@ counters_fields = {
     'results': fields.List(fields.Nested(counter_fields))
 }
 
-counter_parser = reqparse.RequestParser()
-counter_parser.add_argument('name', type=str, required=True)
-counter_parser.add_argument('number', type=int, required=True)
+post_counter_parser = reqparse.RequestParser()
+post_counter_parser.add_argument('name', type=str, required=True)
+post_counter_parser.add_argument('number', type=int, required=True)
 
 
 class CounterCollection(Resource):
@@ -116,7 +125,7 @@ class CounterCollection(Resource):
 
     @marshal_with(counter_fields)
     def post(self, queue_id):
-        args = counter_parser.parse_args()
+        args = post_counter_parser.parse_args()
 
         counter = models.Counter(name=args['name'], number=args['number'])
         counter.queue_id = queue_id
@@ -127,10 +136,35 @@ class CounterCollection(Resource):
         return counter
 
 
-def get_queue(queue_id):
-    queue = models.Queue.query.filter(models.Queue.id == queue_id).first()
+class CounterItem(Resource):
 
-    if not queue:
-        abort(404)
+    @staticmethod
+    def get_counter(counter_id):
+        counter = models.Counter.query.filter(models.Counter.id == counter_id).first()
 
-    return queue
+        if not counter:
+            abort(404)
+
+        return counter
+
+    @marshal_with(counter_fields)
+    def get(self, counter_id, queue_id):
+        return self.get_counter(counter_id)
+
+    @marshal_with(counter_fields)
+    def put(self, counter_id, queue_id):
+        args = post_counter_parser.parse_args()
+
+        counter = self.get_counter(counter_id)
+        counter.name = args['name']
+        counter.number = args['number']
+
+        models.db.session.commit()
+
+        return counter
+
+    def delete(self, counter_id, queue_id):
+        counter = self.get_counter(counter_id)
+
+        models.db.session.delete(counter)
+        models.db.session.commit()
