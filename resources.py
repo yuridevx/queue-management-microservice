@@ -1,4 +1,5 @@
 from flask_restful import Resource, reqparse, fields, marshal_with, abort
+from sqlalchemy import and_, func
 
 import models
 
@@ -112,7 +113,8 @@ class CounterCollection(Resource):
     def get(self, queue_id):
         args = get_parser.parse_args()
 
-        counters = models.Counter.query.filter(models.Counter.queue_id == queue_id).all()
+        counters = models.Counter.query.filter(models.Counter.queue_id == queue_id).offset(args['start']).limit(
+            args['limit']).all()
 
         res = {
             'start': args['start'],
@@ -168,3 +170,105 @@ class CounterItem(Resource):
 
         models.db.session.delete(counter)
         models.db.session.commit()
+
+
+ticket_fields = {
+    'id': fields.Integer,
+    'queue_id': fields.Integer,
+    'counter_id': fields.Integer,
+    'createdAt': fields.DateTime(dt_format='iso8601'),
+    'updatedAt': fields.DateTime(dt_format='iso8601'),
+}
+
+tickets_fields = {
+    'start': fields.Integer,
+    'limit': fields.Integer,
+    'count': fields.Integer,
+    'results': fields.List(fields.Nested(ticket_fields))
+}
+
+
+class TicketCollection(Resource):
+    @marshal_with(tickets_fields)
+    def get(self, queue_id, counter_id=None):
+        args = get_parser.parse_args()
+
+        counters = models.Ticket.query.filter(
+            and_(models.Ticket.queue_id == queue_id, models.Ticket.counter_id == counter_id)).offset(
+            args['start']).limit(args['limit']).all()
+
+        res = {
+            'start': args['start'],
+            'limit': args['limit'],
+            'count': len(counters),
+            'results': counters
+        }
+
+        return res, 200 if len(counters) > 0 else 204
+
+    @marshal_with(ticket_fields)
+    def post(self, queue_id, counter_id=None):
+        ticket = models.Ticket(queue_id=queue_id, counter_id=counter_id)
+
+        models.db.session.add(ticket)
+
+        if counter_id is None:
+            self.fill_to_counter(ticket)
+
+        models.db.session.commit()
+
+        return ticket
+
+    def fill_to_counter(self, ticket):
+        counter_id = models.db.session.query(models.Counter.id).outerjoin(models.Ticket).filter(
+            models.Ticket.id == None).limit(1).scalar()
+
+        ticket.counter_id = counter_id
+
+
+class TicketItem(Resource):
+
+    @staticmethod
+    def get_ticket(ticket_id):
+        counter = models.Ticket.query.filter(models.Ticket.id == ticket_id).first()
+
+        if not counter:
+            abort(404)
+
+        return counter
+
+    @marshal_with(ticket_fields)
+    def get(self, queue_id, ticket_id, counter_id=None):
+        return self.get_ticket(ticket_id)
+
+    @marshal_with(ticket_fields)
+    def put(self, queue_id, ticket_id, counter_id=None):
+        ticket = self.get_ticket(ticket_id)
+
+        models.db.session.commit()
+
+        return ticket
+
+    def delete(self, queue_id, ticket_id, counter_id=None):
+        ticket = self.get_ticket(ticket_id)
+
+        queue_id = ticket.queue_id
+        counter_id = ticket.counter_id
+
+        models.db.session.delete(ticket)
+
+        if counter_id:
+            self.refresh_counter(counter_id, queue_id)
+
+        models.db.session.commit()
+
+    @staticmethod
+    def refresh_counter(counter_id, queue_id):
+        is_zero_tickets = models.db.session.query(func.count('*')).select_from(models.Ticket).filter(
+            models.Ticket.counter_id == counter_id).limit(1).scalar() == 0
+
+        if is_zero_tickets:
+            free_ticket = models.Ticket.query.filter(
+                and_(models.Ticket.counter_id == None, models.Ticket.queue_id == queue_id)).first()
+            if free_ticket:
+                free_ticket.counter_id = counter_id
