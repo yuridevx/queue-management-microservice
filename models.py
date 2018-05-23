@@ -3,6 +3,8 @@ import datetime
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import func, and_
 
+import constants
+
 db = SQLAlchemy()
 
 
@@ -11,7 +13,7 @@ class Queue(db.Model):
 
     name = db.Column(db.String)
 
-    ticketNumber = db.Column(db.Integer, default=0)
+    lastTicketNumber = db.Column(db.Integer, default=0)
 
     createdAt = db.Column(db.DateTime, default=datetime.datetime.now)
     updatedAt = db.Column(db.DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)
@@ -26,11 +28,28 @@ class Counter(db.Model):
 
     queueId = db.Column(db.Integer, db.ForeignKey('queue.id'))
 
+    queue = db.relationship('Queue', backref="counters")
+
     createdAt = db.Column(db.DateTime, default=datetime.datetime.now)
     updatedAt = db.Column(db.DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)
 
     def update_number(self):
-        pass
+        used_numbers = db.session.query(Counter.id, Counter.number).all()
+
+        excluded_numbers = []
+
+        for id, number in used_numbers:
+            if id == self.id:
+                continue
+
+            if number == 0:
+                continue
+
+            excluded_numbers.append(number)
+
+        self.number = db.session.query(func.min(Ticket.number)).filter(
+            (Ticket.queueId == self.queueId) & Ticket.number.notin_(excluded_numbers)
+        ).scalar()
 
     def assign_tickets(self):
         is_zero_tickets = db.session.query(
@@ -63,7 +82,7 @@ class Ticket(db.Model):
     createdAt = db.Column(db.DateTime, default=datetime.datetime.now)
     updatedAt = db.Column(db.DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)
 
-    def ensure_in_counter(self):
+    def pick_counter(self):
         if self.counter is not None:
             return
 
@@ -78,4 +97,30 @@ class Ticket(db.Model):
         self.counter = counter
 
     def assign_number(self):
-        pass
+        numbers = [
+            number for (number,) in
+            db.session.query(Ticket.number).filter(
+                (Ticket.number > 0) & (Ticket.queueId == self.queue.id)
+            ).all()
+        ]
+
+        self.queue.lastTicketNumber = pick_number(numbers, self.queue.lastTicketNumber)
+        self.number = self.queue.lastTicketNumber
+
+
+def pick_number(numbers, start):
+    overflow = False
+
+    if start < 1:
+        start = 1
+
+    while start in numbers:
+
+        if not overflow and start > constants.COUNTER_MAX:
+            overflow = True
+            start = 1
+            continue
+
+        start += 1
+
+    return start

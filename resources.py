@@ -1,12 +1,13 @@
 from flask_restful import Resource, marshal_with, abort
 from sqlalchemy import and_
 
-import marshal
+import marshaller
 import models
 import parsers
 
+
 class QueueCollection(Resource):
-    @marshal_with(marshal.queue_get)
+    @marshal_with(marshaller.queue_get)
     def get(self):
         args = parsers.get_request.parse_args()
         queues = models.Queue.query.offset(args['start']).limit(args['limit']).all()
@@ -20,7 +21,7 @@ class QueueCollection(Resource):
 
         return res, 200 if len(queues) > 0 else 204
 
-    @marshal_with(marshal.queue)
+    @marshal_with(marshaller.queue)
     def post(self):
         args = parsers.post_name.parse_args()
         queue = models.Queue(name=args['name'])
@@ -40,11 +41,11 @@ class QueueItem(Resource):
 
         return queue
 
-    @marshal_with(marshal.queue)
+    @marshal_with(marshaller.queue)
     def get(self, queueId):
         return self.get_queue(queueId)
 
-    @marshal_with(marshal.queue)
+    @marshal_with(marshaller.queue)
     def put(self, queueId):
         args = parsers.post_name.parse_args()
 
@@ -63,16 +64,16 @@ class QueueItem(Resource):
 
 
 class CounterCollection(Resource):
-    @marshal_with(marshal.counters_get)
+    @marshal_with(marshaller.counters_get)
     def get(self, queueId):
         args = parsers.get_request.parse_args()
 
         counters = models.Counter.query.filter(
             models.Counter.queueId == queueId
-        ).offset(
-            args['start']
         ).limit(
             args['limit']
+        ).offset(
+            args['start']
         ).all()
 
         res = {
@@ -84,7 +85,7 @@ class CounterCollection(Resource):
 
         return res, 200 if len(counters) > 0 else 204
 
-    @marshal_with(marshal.counter)
+    @marshal_with(marshaller.counter)
     def post(self, queueId):
         args = parsers.post_name.parse_args()
 
@@ -108,11 +109,11 @@ class CounterItem(Resource):
 
         return counter
 
-    @marshal_with(marshal.counter)
+    @marshal_with(marshaller.counter)
     def get(self, counterId, queueId):
         return self.get_counter(counterId)
 
-    @marshal_with(marshal.counter)
+    @marshal_with(marshaller.counter)
     def put(self, counterId, queueId):
         args = parsers.post_name.parse_args()
 
@@ -131,7 +132,7 @@ class CounterItem(Resource):
 
 
 class TicketCollection(Resource):
-    @marshal_with(marshal.ticket_get)
+    @marshal_with(marshaller.ticket_get)
     def get(self, queueId, counterId=None):
         args = parsers.get_request.parse_args()
 
@@ -140,6 +141,8 @@ class TicketCollection(Resource):
                 models.Ticket.queueId == queueId,
                 models.Ticket.counterId == counterId
             )
+        ).order_by(
+            models.Ticket.number
         ).offset(
             args['start']
         ).limit(
@@ -155,15 +158,17 @@ class TicketCollection(Resource):
 
         return res, 200 if len(counters) > 0 else 204
 
-    @marshal_with(marshal.ticket)
+    @marshal_with(marshaller.ticket)
     def post(self, queueId, counterId=None):
         ticket = models.Ticket(queueId=queueId, counterId=counterId)
 
         models.db.session.add(ticket)
 
-        ticket.ensure_in_counter()
+        ticket.pick_counter()
         ticket.assign_number()
-        ticket.counter.update_number()
+
+        if ticket.counter is not None:
+            ticket.counter.update_number()
 
         models.db.session.commit()
 
@@ -181,7 +186,7 @@ class TicketItem(Resource):
 
         return counter
 
-    @marshal_with(marshal.ticket)
+    @marshal_with(marshaller.ticket)
     def get(self, queueId, ticketId, counterId=None):
         return self.get_ticket(ticketId)
 
@@ -193,5 +198,6 @@ class TicketItem(Resource):
         models.db.session.delete(ticket)
 
         counter.assign_tickets()
+        counter.update_number()
 
         models.db.session.commit()
