@@ -1,0 +1,1 @@
+COUNTER_MAX = 1
