@@ -84,15 +84,19 @@ class Ticket(db.Model):
     updatedAt = db.Column(db.DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)
 
     def pick_counter(self):
-        if self.counter is not None:
+        if self.counterId is not None:
             return
+
+        if self.queueId is None:
+            raise IndexError("Queue id must be set")
 
         counter = db.session.query(
             Counter
         ).outerjoin(
             Ticket
         ).filter(
-            Ticket.id == None
+            (Counter.queueId == self.queueId) &
+            (Ticket.id == None)
         ).first()
 
         self.counter = counter
@@ -101,7 +105,8 @@ class Ticket(db.Model):
         numbers = [
             number for (number,) in
             db.session.query(Ticket.number).filter(
-                (Ticket.number > 0) & (Ticket.queueId == self.queue.id)
+                (Ticket.number > 0) &
+                (Ticket.queueId == self.queueId)
             ).all()
         ]
 

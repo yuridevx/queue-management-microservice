@@ -17,38 +17,39 @@ with app.app_context():
     c22 = models.Counter(name='First queue, counter 2', queue=q2)
 
     models.db.session.add_all([q1, q2, c11, c12, c21, c22])
+    models.db.session.commit()
 
-    t11 = models.Ticket(queue=q1)
+    t11 = models.Ticket(queue=q1, queueId=q1.id)
     t11.pick_counter()
     t11.assign_number()
 
     models.db.session.add(t11)
 
-    t12 = models.Ticket(queue=q1)
+    t12 = models.Ticket(queue=q1, queueId=q1.id)
     t12.pick_counter()
     t12.assign_number()
 
     models.db.session.add(t12)
 
-    t13 = models.Ticket(queue=q1)
+    t13 = models.Ticket(queue=q1, queueId=q1.id)
     t13.pick_counter()
     t13.assign_number()
 
     models.db.session.add(t13)
 
-    t21 = models.Ticket(queue=q2)
+    t21 = models.Ticket(queue=q2, queueId=q2.id)
     t21.pick_counter()
     t21.assign_number()
 
     models.db.session.add(t21)
 
-    t22 = models.Ticket(queue=q2)
+    t22 = models.Ticket(queue=q2, queueId=q2.id)
     t22.pick_counter()
     t22.assign_number()
 
     models.db.session.add(t22)
 
-    t23 = models.Ticket(queue=q2)
+    t23 = models.Ticket(queue=q2, queueId=q2.id)
     t23.pick_counter()
     t23.assign_number()
 
@@ -67,4 +68,3 @@ with app.app_context():
 
     c22.update_number()
     models.db.session.commit()
-
