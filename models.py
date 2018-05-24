@@ -26,7 +26,7 @@ class Counter(db.Model):
 
     number = db.Column(db.Integer, default=0)
 
-    queueId = db.Column(db.Integer, db.ForeignKey('queue.id'))
+    queueId = db.Column(db.Integer, db.ForeignKey('queue.id', ondelete="CASCADE", onupdate="RESTRICT"))
 
     queue = db.relationship('Queue', backref="counters")
 
@@ -34,7 +34,7 @@ class Counter(db.Model):
     updatedAt = db.Column(db.DateTime, default=datetime.datetime.now, onupdate=datetime.datetime.now)
 
     def update_number(self):
-        used_numbers = db.session.query(Counter.id, Counter.number).all()
+        used_numbers = db.session.query(Counter.id, Counter.number).filter(Counter.queueId == self.queueId).all()
 
         excluded_numbers = []
 
@@ -71,8 +71,9 @@ class Counter(db.Model):
 class Ticket(db.Model):
     id = db.Column(db.Integer, primary_key=True)
 
-    queueId = db.Column(db.Integer, db.ForeignKey('queue.id'))
-    counterId = db.Column(db.Integer, db.ForeignKey('counter.id'), nullable=True)
+    queueId = db.Column(db.Integer, db.ForeignKey('queue.id', ondelete="CASCADE", onupdate="RESTRICT"))
+    counterId = db.Column(db.Integer, db.ForeignKey('counter.id', ondelete="SET NULL", onupdate="RESTRICT"),
+                          nullable=True)
 
     number = db.Column(db.Integer, default=0)
 
