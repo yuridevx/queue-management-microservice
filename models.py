@@ -48,7 +48,7 @@ class Counter(db.Model):
             excluded_numbers.append(number)
 
         self.number = db.session.query(func.min(Ticket.number)).filter(
-            (Ticket.queueId == self.queueId) & Ticket.number.notin_(excluded_numbers)
+            (Ticket.queueId == self.queueId) & Ticket.number.notin_(excluded_numbers) & (Ticket.counterId == self.id)
         ).scalar()
 
     def assign_tickets(self):

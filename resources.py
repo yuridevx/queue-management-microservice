@@ -196,8 +196,8 @@ class TicketItem(Resource):
         counter = ticket.counter
 
         models.db.session.delete(ticket)
-
         counter.assign_tickets()
+        models.db.session.commit()
         counter.update_number()
 
         models.db.session.commit()
