@@ -1,5 +1,3 @@
-# Digital Queue micro service
+Have you ever seen queue management systems in banks?
 
-Have you ever seen digital queues in banks?
-
-This is Flask rest service that provides queue back-end functionality
+This is Flask rest service that provides queue management back-end functionality
